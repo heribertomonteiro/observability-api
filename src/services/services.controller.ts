@@ -53,4 +53,17 @@ export class ServicesController {
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.servicesService.remove(id);
   }
+
+  @Get(':id/proxy/*path')
+  @ApiOperation({ summary: 'Proxy para uma API externa cadastrada' })
+  async proxyGet(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('path') path: string,
+  ): Promise<{ status: number; data: any; headers: Record<string, any>; responseTime: number }> {
+    return this.servicesService.proxyRequest(
+      id,
+      'GET',
+      path.startsWith('/') ? path : `/${path}`,
+    );
+  }
 }

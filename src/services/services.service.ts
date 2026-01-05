@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class ServicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private http: HttpService,
+  ) {}
 
   findAll() {
     return this.prisma.service.findMany();
@@ -25,5 +29,57 @@ export class ServicesService {
 
   remove(id: string) {
     return this.prisma.service.delete({ where: { id } });
+  }
+
+  async proxyRequest(
+    id: string,
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    path: string,
+    body?: any,
+  ): Promise<{ status: number; data: any; headers: Record<string, any>; responseTime: number }> {
+    const service = await this.prisma.service.findUnique({ where: { id } });
+
+    if (!service || !service.isActive) {
+      throw new Error('Serviço não encontrado ou inativo');
+    }
+
+    const base = service.baseUrl.endsWith('/')
+      ? service.baseUrl
+      : service.baseUrl + '/';
+    const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+    const url = new URL(normalizedPath, base).toString();
+
+    const start = Date.now();
+
+    const response = await this.http
+      .request({
+        method,
+        url,
+        data: body,
+      })
+      .toPromise();
+
+    const responseTime = Date.now() - start;
+
+    await this.prisma.metric.create({
+      data: {
+        serviceId: service.id,
+        method,
+        route: path,
+        responseTime,
+        origin: 'EXTERNAL',
+      },
+    });
+
+    if (!response) {
+      throw new Error('Nenhuma resposta da API externa');
+    }
+
+    return {
+      status: response.status,
+      data: response.data,
+      headers: response.headers as any,
+      responseTime,
+    };
   }
 }

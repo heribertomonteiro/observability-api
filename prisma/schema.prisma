@@ -12,13 +12,17 @@ datasource db {
   provider = "postgresql"
 }
 
+enum MetricOrigin {
+  INTERNAL
+  EXTERNAL
+}
+
 model Service {
   id       String      @id @default(uuid())
   name     String
   baseUrl String
   isActive Boolean     @default(true)
 
-  metrics Metric[]
   logs    Log[]
 
   createdAt DateTime   @default(now())
@@ -27,11 +31,12 @@ model Service {
 model Metric {
   id         String   @id @default(uuid())
   serviceId  String
-  service    Service  @relation(fields: [serviceId], references: [id])
 
   route     String
   method    String
   responseTime Int
+
+  origin    MetricOrigin @default(INTERNAL)
 
   createdAt DateTime @default(now())
 }
