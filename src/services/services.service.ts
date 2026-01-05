@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -6,6 +6,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class ServicesService {
+  private readonly logger = new Logger(ServicesService.name);
+
   constructor(
     private prisma: PrismaService,
     private http: HttpService,
@@ -40,6 +42,7 @@ export class ServicesService {
     const service = await this.prisma.service.findUnique({ where: { id } });
 
     if (!service || !service.isActive) {
+      this.logger.warn('Tentativa de proxy para serviço inexistente ou inativo', { serviceId: id });
       throw new Error('Serviço não encontrado ou inativo');
     }
 
@@ -51,13 +54,44 @@ export class ServicesService {
 
     const start = Date.now();
 
-    const response = await this.http
-      .request({
+    this.logger.log(`Proxy request started`, {
+      serviceId: service.id,
+      method,
+      url,
+    });
+
+    let response;
+    try {
+      response = await this.http
+        .request({
+          method,
+          url,
+          data: body,
+        })
+        .toPromise();
+    } catch (error) {
+      const responseTimeOnError = Date.now() - start;
+
+      this.logger.error('Erro ao chamar API externa', error.stack || error.message, {
+        serviceId: service.id,
         method,
         url,
-        data: body,
-      })
-      .toPromise();
+        responseTime: responseTimeOnError,
+      });
+
+      // Ainda assim registramos a métrica de erro como EXTERNAL
+      await this.prisma.metric.create({
+        data: {
+          serviceId: service.id,
+          method,
+          route: path,
+          responseTime: responseTimeOnError,
+          origin: 'EXTERNAL',
+        },
+      });
+
+      throw error;
+    }
 
     const responseTime = Date.now() - start;
 
@@ -74,6 +108,14 @@ export class ServicesService {
     if (!response) {
       throw new Error('Nenhuma resposta da API externa');
     }
+
+    this.logger.log('Proxy request completed', {
+      serviceId: service.id,
+      method,
+      url,
+      status: response.status,
+      responseTime,
+    });
 
     return {
       status: response.status,

@@ -1,10 +1,12 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 
 import { Observable, tap } from 'rxjs';
 import { MetricsService } from 'src/metrics/metrics.service';
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(MetricsInterceptor.name);
+
   constructor(private metricsService: MetricsService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -20,8 +22,7 @@ export class MetricsInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         const responseTime = Date.now() - start;
-        // Log simples para confirmar execução do interceptor
-        console.log('[MetricsInterceptor] metric captured', {
+        this.logger.debug('Metric captured', {
           serviceId,
           method,
           route,
@@ -36,7 +37,11 @@ export class MetricsInterceptor implements NestInterceptor {
           origin: 'INTERNAL',
         }).catch((error) => {
           // Não quebrar a requisição caso a gravação da métrica falhe
-          console.error('[MetricsInterceptor] failed to persist metric', error);
+          this.logger.error('Failed to persist internal metric', error.stack || error.message, {
+            serviceId,
+            method,
+            route,
+          });
         });
       }),
     );

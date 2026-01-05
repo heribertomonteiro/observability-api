@@ -24,6 +24,29 @@ export class MetricsService {
     });
   }
 
+  async getStatsByOrigin(origin: 'INTERNAL' | 'EXTERNAL') {
+    const groups = await this.prisma.metric.groupBy({
+      by: ['serviceId', 'route'],
+      where: { origin },
+      _count: { _all: true },
+      _avg: { responseTime: true },
+      _min: { responseTime: true, createdAt: true },
+      _max: { responseTime: true, createdAt: true },
+      orderBy: { _avg: { responseTime: 'desc' } },
+    });
+
+    return groups.map((g) => ({
+      serviceId: g.serviceId,
+      route: g.route,
+      count: g._count._all,
+      avgResponseTime: g._avg.responseTime,
+      minResponseTime: g._min.responseTime,
+      maxResponseTime: g._max.responseTime,
+      firstSeenAt: g._min.createdAt,
+      lastSeenAt: g._max.createdAt,
+    }));
+  }
+
   findOne(id: string) {
     return this.prisma.metric.findUnique({
       where: { id },

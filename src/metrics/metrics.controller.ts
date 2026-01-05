@@ -38,6 +38,56 @@ export class MetricsController {
     return this.metricsService.findByOrigin('EXTERNAL');
   }
 
+  @Get('stats/internal')
+  @ApiOperation({ summary: 'Estatísticas de latência por rota para métricas internas' })
+  @ApiOkResponse({
+    description: 'Uma entrada por combinação de serviceId + route',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          serviceId: { type: 'string' },
+          route: { type: 'string' },
+          count: { type: 'number' },
+          avgResponseTime: { type: 'number' },
+          minResponseTime: { type: 'number' },
+          maxResponseTime: { type: 'number' },
+          firstSeenAt: { type: 'string', format: 'date-time' },
+          lastSeenAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
+  getInternalStats() {
+    return this.metricsService.getStatsByOrigin('INTERNAL');
+  }
+
+  @Get('stats/external')
+  @ApiOperation({ summary: 'Estatísticas de latência por rota para métricas externas' })
+  @ApiOkResponse({
+    description: 'Uma entrada por combinação de serviceId + route',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          serviceId: { type: 'string' },
+          route: { type: 'string' },
+          count: { type: 'number' },
+          avgResponseTime: { type: 'number' },
+          minResponseTime: { type: 'number' },
+          maxResponseTime: { type: 'number' },
+          firstSeenAt: { type: 'string', format: 'date-time' },
+          lastSeenAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
+  getExternalStats() {
+    return this.metricsService.getStatsByOrigin('EXTERNAL');
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.metricsService.findOne(id);
